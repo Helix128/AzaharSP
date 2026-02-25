@@ -1,3 +1,4 @@
+// Edited for AzaharSP | Helix128
 // Copyright 2019 Citra Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
@@ -14,10 +15,34 @@ namespace Core::RPC {
 class UDPServer::Impl {
 public:
     explicit Impl(std::function<void(std::unique_ptr<Packet>)> new_request_callback)
-        // Use a random high port
-        // TODO: Make configurable or increment port number on failure
-        : socket(io_context, boost::asio::ip::udp::endpoint(boost::asio::ip::udp::v4(), 45987)),
-          new_request_callback(std::move(new_request_callback)) {
+        // Socket is opened and bound in the constructor body to allow port auto-increment
+        : socket(io_context), new_request_callback(std::move(new_request_callback)) {
+
+        // Try ports starting at 45987, incrementing on EADDRINUSE to support
+        // multiple simultaneous instances each getting a unique RPC port.
+        constexpr u16 base_port = 45987;
+        constexpr u16 port_range = 16;
+        bool bound = false;
+        for (u16 port = base_port; port < base_port + port_range; ++port) {
+            boost::system::error_code ec;
+            socket.open(boost::asio::ip::udp::v4(), ec);
+            if (ec) {
+                LOG_ERROR(RPC_Server, "Failed to open UDP socket: {}", ec.message());
+                break;
+            }
+            socket.bind(boost::asio::ip::udp::endpoint(boost::asio::ip::udp::v4(), port), ec);
+            if (!ec) {
+                LOG_INFO(RPC_Server, "RPC server bound to UDP port {}", port);
+                bound = true;
+                break;
+            }
+            socket.close();
+        }
+        if (!bound) {
+            LOG_ERROR(RPC_Server,
+                      "Failed to bind RPC server to any UDP port in range {}..{}",
+                      base_port, static_cast<u16>(base_port + port_range - 1));
+        }
 
         StartReceive();
         worker_thread = std::thread([this] { io_context.run(); });

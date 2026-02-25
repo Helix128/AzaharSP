@@ -1,6 +1,7 @@
 // Copyright 2018 Citra Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
+// Edited for AzaharSP | Helix128
 
 #pragma once
 
@@ -56,6 +57,15 @@ public:
      */
     void UpdateGameList(QStandardItemModel* game_list);
 
+    /**
+     * When set to true, the next automatic open of the room window that would be
+     * triggered by OnNetworkStateChanged is suppressed (and the flag is cleared).
+     * Call this before a programmatic Join/Create to avoid an unexpected popup.
+     */
+    void SetSuppressAutoOpenRoom(bool suppress) {
+        suppress_auto_open_room = suppress;
+    }
+
 public slots:
     void OnNetworkStateChanged(const Network::RoomMember::State& state);
     void OnNetworkError(const Network::RoomMember::Error& error);
@@ -92,6 +102,8 @@ private:
     Network::RoomMember::CallbackHandle<Network::RoomMember::Error> error_callback_handle;
 
     bool show_notification = false;
+    // When true, the next OnNetworkStateChanged auto-open is skipped once.
+    bool suppress_auto_open_room = false;
 };
 
 Q_DECLARE_METATYPE(Common::WebResult);

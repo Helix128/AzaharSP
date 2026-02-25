@@ -402,6 +402,15 @@ private:
     // Whether game was paused due to stopping video dumping
     bool game_paused_for_dumping = false;
 
+    // [AzaharSP] CLI-driven room host / join
+    bool cli_host_room = false;
+    QString cli_join_room_ip;                           // non-empty = auto-join on start
+    QString cli_room_name = QStringLiteral("AzaharSP Room");
+    QString cli_room_password;
+    QString cli_room_nickname;
+    u16 cli_room_port = 24872;
+    u32 cli_room_max_players = 4;
+
     QString gl_renderer;
     std::vector<QString> physical_devices;
 

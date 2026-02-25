@@ -1,8 +1,10 @@
+// Edited for AzaharSP | Helix128
 // Copyright Citra Emulator Project / Azahar Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
 #include <clocale>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -109,7 +111,10 @@
 #include "core/savestate.h"
 #include "core/system_titles.h"
 #include "input_common/main.h"
+#include "network/network.h"
 #include "network/network_settings.h"
+#include "network/verify_user.h"
+#include "core/hle/service/cfg/cfg.h"
 #include "ui_main.h"
 #include "video_core/gpu.h"
 #include "video_core/renderer_base.h"
@@ -322,6 +327,72 @@ GMainWindow::GMainWindow(Core::System& system_)
             continue;
         }
 
+        // Custom user data directory (already applied in LaunchQtFrontend; consume arg here)
+        if (args[i] == QStringLiteral("--user-dir") || args[i] == QStringLiteral("-u")) {
+            if (i < args.size() - 1 && !args[i + 1].startsWith(QChar::fromLatin1('-'))) {
+                ++i;
+            }
+            continue;
+        }
+
+        // [AzaharSP] Host a private room on startup
+        if (args[i] == QStringLiteral("--host-room") || args[i] == QStringLiteral("-H")) {
+            cli_host_room = true;
+            continue;
+        }
+
+        // [AzaharSP] Join a room on startup: --join-room <ip>
+        if (args[i] == QStringLiteral("--join-room") || args[i] == QStringLiteral("-J")) {
+            if (i < args.size() - 1 && !args[i + 1].startsWith(QChar::fromLatin1('-'))) {
+                cli_join_room_ip = args[++i];
+            }
+            continue;
+        }
+
+        // [AzaharSP] Room name (host only)
+        if (args[i] == QStringLiteral("--room-name")) {
+            if (i < args.size() - 1 && !args[i + 1].startsWith(QChar::fromLatin1('-'))) {
+                cli_room_name = args[++i];
+            }
+            continue;
+        }
+
+        // [AzaharSP] Room port (host and client, default 24872)
+        if (args[i] == QStringLiteral("--room-port")) {
+            if (i < args.size() - 1 && !args[i + 1].startsWith(QChar::fromLatin1('-'))) {
+                bool ok = false;
+                u16 port = static_cast<u16>(args[++i].toUInt(&ok));
+                if (ok) cli_room_port = port;
+            }
+            continue;
+        }
+
+        // [AzaharSP] Room password (host and client)
+        if (args[i] == QStringLiteral("--room-password")) {
+            if (i < args.size() - 1 && !args[i + 1].startsWith(QChar::fromLatin1('-'))) {
+                cli_room_password = args[++i];
+            }
+            continue;
+        }
+
+        // [AzaharSP] Max players (host only, default 4, minimum 2)
+        if (args[i] == QStringLiteral("--room-max-players")) {
+            if (i < args.size() - 1 && !args[i + 1].startsWith(QChar::fromLatin1('-'))) {
+                bool ok = false;
+                u32 n = args[++i].toUInt(&ok);
+                if (ok && n >= 2) cli_room_max_players = n;
+            }
+            continue;
+        }
+
+        // [AzaharSP] Nickname used in the room (falls back to UISettings if omitted)
+        if (args[i] == QStringLiteral("--room-nickname")) {
+            if (i < args.size() - 1 && !args[i + 1].startsWith(QChar::fromLatin1('-'))) {
+                cli_room_nickname = args[++i];
+            }
+            continue;
+        }
+
         // Launch game at path
         if (i == args.size() - 1 && !args[i].startsWith(QChar::fromLatin1('-'))) {
             game_path = args[i];
@@ -463,6 +534,85 @@ GMainWindow::GMainWindow(Core::System& system_)
 
     if (!game_path.isEmpty()) {
         BootGame(game_path);
+    }
+
+    // [AzaharSP] Process CLI-driven room host / join after the event loop starts
+    // so the multiplayer UI state is fully wired up and can reflect the change.
+    //
+    // Design:
+    //  - Room::Create and all validation run on the main thread (fast, no blocking).
+    //  - RoomMember::Join is moved into QtConcurrent::run because it calls
+    //    enet_host_service with a 5000 ms timeout that would freeze the GUI.
+    //  - NullBackend is passed to Room::Create so the server thread never
+    //    dereferences a null verify_backend pointer (the previous crash cause).
+    if (cli_host_room || !cli_join_room_ip.isEmpty()) {
+        QTimer::singleShot(0, this, [this] {
+            // Suppress the automatic room-window popup that OnNetworkStateChanged would
+            // otherwise trigger; the user launched headlessly via CLI args.
+            multiplayer_state->SetSuppressAutoOpenRoom(true);
+
+            const std::string nickname =
+                cli_room_nickname.isEmpty()
+                    ? UISettings::values.nickname.toStdString()
+                    : cli_room_nickname.toStdString();
+            const std::string password = cli_room_password.toStdString();
+            const u16         port     = cli_room_port;
+
+            const std::string console_id = Service::CFG::GetConsoleIdHash(system);
+            const auto        mac        = Service::CFG::GetConsoleMacAddress(system);
+
+            if (cli_host_room) {
+                auto room   = Network::GetRoom().lock();
+                auto member = Network::GetRoomMember().lock();
+                if (!room || !member) {
+                    LOG_ERROR(Frontend, "[AzaharSP] --host-room: network not initialized");
+                    return;
+                }
+                const std::string name  = cli_room_name.toStdString();
+                const u32         space = cli_room_max_players;
+
+                // Room::Create is non-blocking: it calls enet_host_create and
+                // launches the ServerLoop thread. NullBackend is required for
+                // private rooms -- passing nullptr here was the original crash.
+                // Hoist the unique_ptr and BanList into named locals to avoid
+                // MSVC C2760 when complex expressions appear inside an if-condition.
+                auto verify = std::make_unique<Network::VerifyUser::NullBackend>();
+                Network::Room::BanList empty_ban_list;
+                bool created = room->Create(name, "", "", port, password, space, nickname, "", 0,std::move(verify), empty_ban_list);
+
+                if (!created) {
+                    LOG_ERROR(Frontend,
+                              "[AzaharSP] --host-room: Room::Create failed (port {} in use?)",
+                              port);
+                    QMessageBox::critical(
+                        this, tr("Room Creation Failed"),
+                        tr("Could not create room on port %1.\nThe port may already be in use.")
+                            .arg(port));
+                    return;
+                }
+
+                // RoomMember::Join blocks for up to 5 s (ENet connect timeout);
+                // run it off the main thread to keep the UI responsive.
+                QtConcurrent::run([member, nickname, console_id, port, mac, password] {
+                    member->Join(nickname, console_id, "127.0.0.1", port, 0, mac, password, "");
+                    LOG_INFO(Frontend, "[AzaharSP] Host joined own room on port {}", port);
+                });
+
+            } else {
+                // --join-room <ip>
+                auto member = Network::GetRoomMember().lock();
+                if (!member) {
+                    LOG_ERROR(Frontend, "[AzaharSP] --join-room: network not initialized");
+                    return;
+                }
+                const std::string ip = cli_join_room_ip.toStdString();
+
+                QtConcurrent::run([member, nickname, console_id, ip, port, mac, password] {
+                    member->Join(nickname, console_id, ip.c_str(), port, 0, mac, password, "");
+                    LOG_INFO(Frontend, "[AzaharSP] Joined room at {}:{}", ip, port);
+                });
+            }
+        });
     }
 }
 
@@ -4266,6 +4416,29 @@ static Qt::HighDpiScaleFactorRoundingPolicy GetHighDpiRoundingPolicy() {
 }
 
 int LaunchQtFrontend(int argc, char* argv[]) {
+    // Resolve --user-dir / -u at the very beginning — before any chdir() calls
+    // (e.g., the macOS bundle SetCurrentDir below) can affect relative paths.
+    // std::filesystem::absolute() anchors the path to the launch-time CWD, so
+    // both absolute and relative arguments work correctly on all platforms.
+    for (int i = 1; i < argc; ++i) {
+        if ((strcmp(argv[i], "--user-dir") == 0 || strcmp(argv[i], "-u") == 0) &&
+            i + 1 < argc) {
+            namespace fs = std::filesystem;
+            // Resolve relative → absolute, then normalize ./ and ../ segments.
+            // weakly_canonical does not require the target path to already exist.
+            std::string resolved =
+                fs::weakly_canonical(fs::absolute(argv[i + 1])).generic_string();
+            // Ensure the trailing separator that SetUserPath concatenates against.
+            if (!resolved.empty() && resolved.back() != DIR_SEP_CHR) {
+                resolved += DIR_SEP;
+            }
+            FileUtil::SetUserPath(resolved);
+            // The logger is not yet initialized at this point; use stdout instead.
+            std::cout << "[AzaharSP] Using custom user directory: " << resolved << std::endl;
+            break;
+        }
+    }
+
 #ifdef __APPLE__
     // Ensure that the linker doesn't optimize qt_swizzle.mm out of existence.
     QtSwizzle::Dummy();

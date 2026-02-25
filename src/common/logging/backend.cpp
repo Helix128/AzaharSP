@@ -1,3 +1,4 @@
+// Edited for AzaharSP | Helix128
 // Copyright Citra Emulator Project / Azahar Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
@@ -10,8 +11,9 @@
 
 #ifdef _WIN32
 #include <share.h>   // For _SH_DENYWR
-#include <windows.h> // For OutputDebugStringW
+#include <windows.h> // For OutputDebugStringW and GetCurrentProcessId
 #else
+#include <unistd.h>  // For getpid()
 #define _SH_DENYWR 0
 #endif
 
@@ -162,6 +164,20 @@ public:
         // _SH_DENYWR allows read only access to the file for other programs.
         // It is #defined to 0 on other platforms
         file = std::make_unique<FileUtil::IOFile>(filename, "w", _SH_DENYWR);
+
+        // If the primary log file could not be opened (e.g., another instance holds it
+        // locked via _SH_DENYWR), fall back to a PID-suffixed filename so each
+        // simultaneous instance writes to its own log file.
+        if (!file->IsOpen()) {
+#ifdef _WIN32
+            const auto pid = static_cast<unsigned long>(GetCurrentProcessId());
+#else
+            const auto pid = static_cast<unsigned long>(getpid());
+#endif
+            auto pid_filename = filename;
+            boost::replace_all(pid_filename, ".txt", fmt::format("_{}.txt", pid));
+            file = std::make_unique<FileUtil::IOFile>(pid_filename, "w", _SH_DENYWR);
+        }
     }
 
     ~FileBackend() override = default;

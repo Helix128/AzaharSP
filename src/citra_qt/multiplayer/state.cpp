@@ -1,6 +1,7 @@
 // Copyright 2018 Citra Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
+// Edited for AzaharSP | Helix128
 
 #include <QAction>
 #include <QApplication>
@@ -111,7 +112,12 @@ void MultiplayerState::OnNetworkStateChanged(const Network::RoomMember::State& s
     if (state == Network::RoomMember::State::Joined ||
         state == Network::RoomMember::State::Moderator) {
 
-        OnOpenNetworkRoom();
+        if (suppress_auto_open_room) {
+            // CLI-initiated join/host: skip the automatic popup once.
+            suppress_auto_open_room = false;
+        } else {
+            OnOpenNetworkRoom();
+        }
         status_icon->setPixmap(QIcon::fromTheme(QStringLiteral("connected")).pixmap(16));
         status_text->setText(tr("Connected"));
         leave_room->setEnabled(true);

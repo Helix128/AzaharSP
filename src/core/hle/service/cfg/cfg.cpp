@@ -1,3 +1,4 @@
+// Edited for AzaharSP | Helix128
 // Copyright Citra Emulator Project / Azahar Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
@@ -1046,8 +1047,19 @@ std::string& Module::GetMacAddress() {
 }
 
 void Module::SaveMacAddress() {
+    const std::string sysdata_dir = FileUtil::GetUserPath(FileUtil::UserPath::SysDataDir);
+
+    // [AzaharSP] Ensure the sysdata directory exists before writing.
+    // When a fresh --user-dir is used this directory does not yet exist, and
+    // the silent open-for-write failure would cause a new random MAC to be
+    // generated on every launch instead of being persisted.
+    if (!FileUtil::CreateFullPath(sysdata_dir)) {
+        LOG_ERROR(Service_CFG, "Cannot create sysdata directory: {}", sysdata_dir);
+        return;
+    }
+
     FileUtil::IOFile mac_address_file(
-        fmt::format("{}/mac.txt", FileUtil::GetUserPath(FileUtil::UserPath::SysDataDir)), "wb");
+        fmt::format("{}/mac.txt", sysdata_dir), "wb");
 
     if (!mac_address_file.IsOpen()) {
         LOG_ERROR(Service_CFG, "Cannot open mac address file for write");
