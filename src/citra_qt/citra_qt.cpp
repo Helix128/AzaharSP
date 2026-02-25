@@ -1489,7 +1489,7 @@ void GMainWindow::BootGame(const QString& filename) {
         game_list->hide();
         game_list_placeholder->hide();
     }
-    status_bar_update_timer.start(1000);
+    status_bar_update_timer.start(500);
 
     if (UISettings::values.hide_mouse) {
         mouse_hide_timer.start();
@@ -4111,12 +4111,12 @@ void GMainWindow::UpdateWindowTitle() {
     const QString full_name = QString::fromUtf8(Common::g_build_fullname);
 
     if (game_title.isEmpty()) {
-        setWindowTitle(QStringLiteral("Azahar %1").arg(full_name));
+        setWindowTitle(QStringLiteral("AzaharSP (%1)").arg(full_name));
     } else {
-        setWindowTitle(QStringLiteral("Azahar %1 | %2").arg(full_name, game_title));
+        setWindowTitle(QStringLiteral("AzaharSP (%1) [%2]").arg(full_name, game_title));
         render_window->setWindowTitle(
-            QStringLiteral("Azahar %1 | %2 | %3").arg(full_name, game_title, tr("Primary Window")));
-        secondary_window->setWindowTitle(QStringLiteral("Azahar %1 | %2 | %3")
+            QStringLiteral("AzaharSP (%1) [%2] - %3").arg(full_name, game_title, tr("Primary Window")));
+        secondary_window->setWindowTitle(QStringLiteral("AzaharSP (%1) [%2] - %3")
                                              .arg(full_name, game_title, tr("Secondary Window")));
     }
 }

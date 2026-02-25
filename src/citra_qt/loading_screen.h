@@ -72,7 +72,7 @@ private:
     // If the rolling_average * shaders_remaining > eta_break_point then we want to display the eta.
     // We don't want to always display it since showing an ETA leads people to think its taking
     // longer that it is because ETAs are often wrong
-    static constexpr std::chrono::seconds ETABreakPoint = std::chrono::seconds{10};
+    static constexpr std::chrono::seconds ETABreakPoint = std::chrono::seconds{5};
     static constexpr std::size_t NumberOfDataPoints = 25;
     std::chrono::high_resolution_clock::time_point previous_time;
     std::chrono::duration<double> rolling_average = {};

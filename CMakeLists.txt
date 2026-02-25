@@ -80,7 +80,7 @@ endif()
 
 # LTO takes too much memory and time using MSVC.
 if (NOT MSVC AND IS_RELEASE_BUILD)
-    set(DEFAULT_ENABLE_LTO ON)
+    set(DEFAULT_ENABLE_LTO OFF)
 else()
     set(DEFAULT_ENABLE_LTO OFF)
 endif()
@@ -112,11 +112,11 @@ option(ENABLE_QT "Enable the Qt frontend" ON)
 option(ENABLE_QT_TRANSLATION "Enable translations for the Qt frontend" OFF)
 option(ENABLE_QT_UPDATE_CHECKER "Enable built-in update checker for the Qt frontend" OFF)
 
-CMAKE_DEPENDENT_OPTION(ENABLE_TESTS "Enable generating tests executable" ON "NOT IOS" OFF)
+CMAKE_DEPENDENT_OPTION(ENABLE_TESTS "Enable generating tests executable" OFF "NOT IOS" OFF)
 CMAKE_DEPENDENT_OPTION(ENABLE_ROOM "Enable dedicated room functionality" ON "NOT ANDROID AND NOT IOS" OFF)
 CMAKE_DEPENDENT_OPTION(ENABLE_ROOM_STANDALONE "Enable generating a standalone dedicated room executable" ON "ENABLE_ROOM" OFF)
 
-option(ENABLE_WEB_SERVICE "Enable web services (telemetry, etc.)" ON)
+option(ENABLE_WEB_SERVICE "Enable web services (telemetry, etc.)" OFF)
 option(ENABLE_SCRIPTING "Enable RPC server for scripting" ON)
 
 CMAKE_DEPENDENT_OPTION(ENABLE_CUBEB "Enables the cubeb audio backend" ON "NOT IOS" OFF)
@@ -134,12 +134,12 @@ option(ENABLE_MICROPROFILE "Enables microprofile capabilities" OFF)
 
 option(ENABLE_SSE42 "Enable SSE4.2 optimizations on x86_64" ON)
 
-option(ENABLE_DEVELOPER_OPTIONS "Enable functionality targeted at emulator developers" OFF)
+option(ENABLE_DEVELOPER_OPTIONS "Enable functionality targeted at emulator developers" ON)
 
 # Compile options
 CMAKE_DEPENDENT_OPTION(COMPILE_WITH_DWARF "Add DWARF debugging information" ${IS_DEBUG_BUILD} "MINGW" OFF)
 option(ENABLE_LTO "Enable link time optimization" ${DEFAULT_ENABLE_LTO})
-option(ENABLE_NATIVE_OPTIMIZATION "Enables processor-specific optimizations via -march=native" OFF)
+option(ENABLE_NATIVE_OPTIMIZATION "Enables processor-specific optimizations via -march=native" ON)
 option(CITRA_USE_PRECOMPILED_HEADERS "Use precompiled headers" ON)
 option(CITRA_WARNINGS_AS_ERRORS "Enable warnings as errors" ON)
 
@@ -544,7 +544,7 @@ endif()
 add_subdirectory(src)
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT citra_meta)
-
+set(CMAKE_AUTOGEN_PARALLEL 6)
 # Create target for outputting distributable bundles.
 # Not supported for mobile platforms as distributables are built differently.
 if (NOT ANDROID AND NOT IOS)

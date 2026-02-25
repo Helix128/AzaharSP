@@ -65,9 +65,9 @@ QProgressBar::chunk {
 const static std::unordered_map<VideoCore::LoadCallbackStage, const char*> stage_translations{
     {VideoCore::LoadCallbackStage::Prepare, QT_TRANSLATE_NOOP("LoadingScreen", "Loading...")},
     {VideoCore::LoadCallbackStage::Preload,
-     QT_TRANSLATE_NOOP("LoadingScreen", "Preloading Textures %1 / %2")},
+     QT_TRANSLATE_NOOP("LoadingScreen", "Preloading textures %1 / %2")},
     {VideoCore::LoadCallbackStage::Decompile,
-     QT_TRANSLATE_NOOP("LoadingScreen", "Preparing Shaders %1 / %2")},
+     QT_TRANSLATE_NOOP("LoadingScreen", "Preparing shaders %1 / %2")},
     {VideoCore::LoadCallbackStage::Build, QT_TRANSLATE_NOOP("LoadingScreen", "Loading %3 %1 / %2")},
     {VideoCore::LoadCallbackStage::Complete, QT_TRANSLATE_NOOP("LoadingScreen", "Launching...")},
 };
@@ -93,7 +93,7 @@ LoadingScreen::LoadingScreen(QWidget* parent)
     opacity_effect->setOpacity(1);
     ui->fade_parent->setGraphicsEffect(opacity_effect);
     fadeout_animation = std::make_unique<QPropertyAnimation>(opacity_effect, "opacity");
-    fadeout_animation->setDuration(500);
+    fadeout_animation->setDuration(300);
     fadeout_animation->setStartValue(1);
     fadeout_animation->setEndValue(0);
     fadeout_animation->setEasingCurve(QEasingCurve::OutBack);
@@ -176,7 +176,7 @@ void LoadingScreen::OnLoadProgress(VideoCore::LoadCallbackStage stage, std::size
         const auto eta_mseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
             rolling_average * (total - value));
         const auto limited_mseconds = std::max<long>(eta_mseconds.count(), 1000);
-        estimate = tr("Estimated Time %1")
+        estimate = tr("ETA: %1")
                        .arg(QTime(0, 0, 0, 0)
                                 .addMSecs(static_cast<int>(limited_mseconds))
                                 .toString(QStringLiteral("mm:ss")));

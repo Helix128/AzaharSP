@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>About Azahar</string>
+   <string>About Azahar (non-SP)</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_3">
    <item>
