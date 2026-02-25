@@ -1,3 +1,8 @@
+# AzaharSP
+
+This is a fork of Azahar with a few tweaks and launch arguments to easily play multiplayer games locally by opening multiple instances of the emulator with separate settings and save data.
+
+# Original Readme
 ![Azahar Emulator](https://azahar-emu.org/resources/images/logo/azahar-name-and-logo.svg)
 
 ![GitHub Release](https://img.shields.io/github/v/release/azahar-emu/azahar?label=Current%20Release)
